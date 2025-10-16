@@ -29,17 +29,26 @@ def fetch_text(url, selector):
 
 def call_ai(new_txt):
     prompt = f"""
+You will be given HTML content. Your job is to remove ALL HTML tags and return ONLY the visible text content.
+
+Very important instructions:
+- DO NOT return any code (no Python, no pseudocode, no regex, no explanations).
+- DO NOT describe how to do it.
+- DO NOT wrap the output in code blocks.
+- Only return the cleaned text.
+
 Formatting requirements:
-- Keep line breaks, spacing, and indentation similar to how the text would visually appear.
-- For <table>, <tr>, <td>, <th> tags:
-  - Remove the tags but keep the table structure aligned in a readable text format.
-  - Each table row should be on a new line.
-  - Separate table columns using tabs or consistent spaces.
-- For lists (<ul>, <ol>, <li>), preserve the bullet/numbering structure.
-- Preserve headings and their spacing.
-- Do NOT include any HTML tags, attributes, or inline styles.
-- Do NOT summarize or rewrite—only clean and format the text as described.
-- Below is the raw HTML content to be formatted:
+1. Preserve indentation and visual structure of the text.
+2. For tables (<table>, <tr>, <td>, <th>):
+   - Remove all tags but keep the text in a readable table layout.
+   - Each row on a new line.
+   - Separate columns with tabs or consistent spaces.
+3. For lists (<ul>, <ol>, <li>):
+   - Keep bullets or numbering.
+4. Preserve headings and line breaks.
+5. Don't summarize, rephrase, or add commentary.
+
+Your output must be ONLY the cleaned text with correct indentation. Do not include HTML, code, or explanations.
  "{new_txt}"
 
 """
@@ -48,14 +57,15 @@ Formatting requirements:
         model="gemini-2.5-flash",
         contents=prompt,
     )
-    print(response)
+    print(response.text)
+    return response.text
 
 
 def watch_page(name, url, selector, recipient, use_playwright):
     state = load_state()
     new_txt = fetch_text(url, selector)
-    call_ai(new_txt)
-    state[name] = new_txt
+    updated_txt = call_ai(new_txt)
+    state[name] = updated_txt
     # print(new_txt)
     save_state(state)
 
