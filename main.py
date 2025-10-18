@@ -1,6 +1,8 @@
 import json, os, requests
 from bs4 import BeautifulSoup
 from google import genai
+import pandas as pd
+
 
 STATE_FILE = "state.json"
 
@@ -18,13 +20,25 @@ def save_state(state):
 def fetch_text(url, selector):
     r = requests.get(url, timeout=20, headers={"User_Agent": "AI_watcher/1.0"})
     r.raise_for_status()
-    soup = BeautifulSoup(r.text, "html.parser")  ############
-    if selector:
-        # el= soup.select(selector)
-        el = soup.find_all(class_=selector)
-        return el
-    #     return el.get_text( " ", strip=True) if el else " "
-    # return el.get_text(" " , strip= True)
+    # soup = BeautifulSoup(r.text, "html.parser")  ############
+    # if selector:
+    #     # el= soup.select(selector)
+    #     el = soup.find_all(class_=selector)
+    #     if selector:
+    #     # el= soup.select(selector)
+    #         el = soup.find_all(class_=selector)
+    #     return el
+    soup= BeautifulSoup(r.text, "lxml")
+    tables= soup.find_all(class_= selector)
+    for i,table in  enumerate(tables, start=1):
+        html_table=str(table)
+        with open(f"table_{i}.html",'w', encoding="utf-8") as f:
+            f.write(html_table)
+
+
+   
+
+
 
 
 def call_ai(new_txt):
@@ -64,8 +78,8 @@ Your output must be ONLY the cleaned text with correct indentation. Do not inclu
 def watch_page(name, url, selector, recipient, use_playwright):
     state = load_state()
     new_txt = fetch_text(url, selector)
-    updated_txt = call_ai(new_txt)
-    state[name] = updated_txt
+    # updated_txt = call_ai(new_txt)
+    # state[name] = updated_txt
     # print(new_txt)
     save_state(state)
 
