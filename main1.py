@@ -1,60 +1,135 @@
 import pdfkit
 import pdfplumber
 import requests
-import re
+import hashlib, os, json,re
+from google import genai
 
-path_wkthmltopdf = r"C:\Program Files\wkhtmltox\bin\wkhtmltopdf.exe"
-config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
-
-res = requests.get(
-    "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
-).text
-
-filename = "income_tax_page.html"
-
-# 1. Remove tags that load or execute external resources
-res = re.sub(r"<script[^>]*>.*?</script>", "", res, flags=re.IGNORECASE | re.DOTALL)
-res = re.sub(r"<iframe[^>]*>.*?</iframe>", "", res, flags=re.IGNORECASE | re.DOTALL)
-res = re.sub(r"<noscript[^>]*>.*?</noscript>", "", res, flags=re.IGNORECASE | re.DOTALL)
-res = re.sub(r"<object[^>]*>.*?</object>", "", res, flags=re.IGNORECASE | re.DOTALL)
-res = re.sub(r"<embed[^>]*>.*?</embed>", "", res, flags=re.IGNORECASE | re.DOTALL)
-res = re.sub(r"<source[^>]*>.*?</source>", "", res, flags=re.IGNORECASE | re.DOTALL)
-res = re.sub(r"<video[^>]*>.*?</video>", "", res, flags=re.IGNORECASE | re.DOTALL)
-res = re.sub(r"<audio[^>]*>.*?</audio>", "", res, flags=re.IGNORECASE | re.DOTALL)
-
-# 2. Remove self-closing resource tags
-res = re.sub(r"<link[^>]*?>", "", res, flags=re.IGNORECASE)
-res = re.sub(r"<meta[^>]*?>", "", res, flags=re.IGNORECASE)
-res = re.sub(r"<img[^>]*?>", "", res, flags=re.IGNORECASE)
-
-# 3. Remove problematic attributes (href, src, JS events, etc.)
-res = re.sub(
-    r'\s+(href|src|srcset|data-src|prefix)\s*=\s*["\'][^"\']*["\']',
-    "",
-    res,
-    flags=re.IGNORECASE,
-)
-res = re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', "", res, flags=re.IGNORECASE)
-
-with open(filename, "w", encoding="utf-8") as f:
-    f.write(res)
-print(f"res file '{filename}' created successfully.")
-
-# print(res)
-options = {"load-error-handling": "ignore", "load-media-error-handling": "ignore"}
-url = "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
-output_pdf = "income_tax_page.pdf"
-# pdfkit.from_url(url, output_pdf, configuration=config, options=options)
-pdfkit.from_file(filename, output_pdf, configuration=config)
+STATE_FILE="state.json"
 
 
-with pdfplumber.open(output_pdf) as pdf:
-    first_page = pdf.pages[0]
-    text = first_page.extract_text()
-    print(text)
+def generate_256sha(res):
+    encoded_data = res.encode('utf-8')
+    sha256_hash_object = hashlib.sha256()
+    sha256_hash_object.update(encoded_data)
+    return sha256_hash_object.hexdigest()
 
-    tables = first_page.extract_tables()
-    l = []
-    for table in tables:
-        for row in table:
-            print(row)
+def load_state():
+    if os.path.exists(STATE_FILE):
+        return json.load(open(STATE_FILE))
+    return {}
+
+def save_state(hashed_value):
+    with open(STATE_FILE,"w") as f:
+        json.dump(hashed_value, f, indent =2)
+
+def analyze_change(old_text, new_text):
+    # print("Analyze changes")
+    prompt = f"""You are monitoring a website for meaningful updates.
+
+    Old version:
+    {old_text}
+
+    New version:
+    {new_text}
+    Mainly focus on the tables below the text span:
+    1. Tax rates for Individual (resident or non-resident) less than 60 years of age anytime during the previous year are as under:
+    2.Tax rates for Individual (resident or non-resident), 60 years or more but less than 80 years of age anytime during the previous year are as under:
+    3.Tax rates for Individual (resident or non-resident) 80 years of age or more anytime during the previous year are as under:
+
+    Compare the two texts and describe:
+    1. What changed (in one short sentence)
+    2. Whether this change seems important (rate 1–5, where 5 is very important)
+
+    Reply in JSON like this:
+    {{"summary": "...", "importance": 4}}
+
+    """
+    client = genai.Client()
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
+    print(response.text)
+    return response.text
+
+def html_to_pdf(url):
+    path_wkthmltopdf = r"C:\Program Files\wkhtmltox\bin\wkhtmltopdf.exe"
+    config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
+
+    res = requests.get(
+        "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+    ).text
+
+    filename = "income_tax_page.html"
+
+    # 1. Remove tags that load or execute external resources
+    res = re.sub(r"<script[^>]*>.*?</script>", "", res, flags=re.IGNORECASE | re.DOTALL)
+    res = re.sub(r"<iframe[^>]*>.*?</iframe>", "", res, flags=re.IGNORECASE | re.DOTALL)
+    res = re.sub(r"<noscript[^>]*>.*?</noscript>", "", res, flags=re.IGNORECASE | re.DOTALL)
+    res = re.sub(r"<object[^>]*>.*?</object>", "", res, flags=re.IGNORECASE | re.DOTALL)
+    res = re.sub(r"<embed[^>]*>.*?</embed>", "", res, flags=re.IGNORECASE | re.DOTALL)
+    res = re.sub(r"<source[^>]*>.*?</source>", "", res, flags=re.IGNORECASE | re.DOTALL)
+    res = re.sub(r"<video[^>]*>.*?</video>", "", res, flags=re.IGNORECASE | re.DOTALL)
+    res = re.sub(r"<audio[^>]*>.*?</audio>", "", res, flags=re.IGNORECASE | re.DOTALL)
+
+    # 2. Remove self-closing resource tags
+    res = re.sub(r"<link[^>]*?>", "", res, flags=re.IGNORECASE)
+    res = re.sub(r"<meta[^>]*?>", "", res, flags=re.IGNORECASE)
+    res = re.sub(r"<img[^>]*?>", "", res, flags=re.IGNORECASE)
+
+    # 3. Remove problematic attributes (href, src, JS events, etc.)
+    res = re.sub(
+        r'\s+(href|src|srcset|data-src|prefix)\s*=\s*["\'][^"\']*["\']',
+        "",
+        res,
+        flags=re.IGNORECASE,
+    )
+    res = re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', "", res, flags=re.IGNORECASE)
+
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(res)
+    print(f"res file '{filename}' created successfully.")
+
+    # print(res)
+    options = {"load-error-handling": "ignore", "load-media-error-handling": "ignore"}
+    url = "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+    output_pdf = "income_tax_page.pdf"
+    # pdfkit.from_url(url, output_pdf, configuration=config, options=options)
+    pdfkit.from_file(filename, output_pdf, configuration=config)
+
+
+
+    with pdfplumber.open(output_pdf) as pdf:
+        first_page = pdf.pages[0]
+        text = first_page.extract_text()
+        print(text)
+
+        tables = first_page.extract_tables()
+        l = []
+        for table in tables:
+            for row in table:
+                print(row)
+    return res
+
+
+if __name__== "__main__":
+    url = "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+    res=html_to_pdf(url)
+    # print("Done")
+    hashed_value=generate_256sha(res)
+    x=load_state()
+    
+    if x=={}:
+        store_hash= {"hash_val": hashed_value, "content" : res}
+        save_state(store_hash)
+    else:
+        if x["hash_val"] != hashed_value:
+            answer = analyze_change(x["content"], res)
+
+            
+        
+
+
+
+
+
