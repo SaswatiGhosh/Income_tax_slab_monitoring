@@ -3,6 +3,9 @@ import pdfplumber
 import requests
 import hashlib, os, json,re
 from google import genai
+from email.message import EmailMessage
+import smtplib
+
 
 STATE_FILE="state.json"
 
@@ -49,16 +52,24 @@ def analyze_change(old_text, new_text):
         model="gemini-2.5-flash",
         contents=prompt,
     )
-    print(response.text)
-    return response.text
+    res=response.text
+    clean = re.sub(r'(?s).*?(\{.*?\}).*', r'\1', res)
+    print(clean)
+    x=json.loads(clean)
+    print(x)
+
+    
+    
+    return x["summary"],x["importance"]
+
+     
 
 def html_to_pdf(url):
+
     path_wkthmltopdf = r"C:\Program Files\wkhtmltox\bin\wkhtmltopdf.exe"
     config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
 
-    res = requests.get(
-        "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
-    ).text
+    res = requests.get(url).text
 
     filename = "income_tax_page.html"
 
@@ -92,7 +103,7 @@ def html_to_pdf(url):
 
     # print(res)
     options = {"load-error-handling": "ignore", "load-media-error-handling": "ignore"}
-    url = "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+    # url = "http://127.0.0.1:5000/"
     output_pdf = "income_tax_page.pdf"
     # pdfkit.from_url(url, output_pdf, configuration=config, options=options)
     pdfkit.from_file(filename, output_pdf, configuration=config)
@@ -112,8 +123,21 @@ def html_to_pdf(url):
     return res
 
 
+def send_email(subject , body, recipients):
+    msg=EmailMessage()
+    msg["Subject"]=subject
+    msg["From"] =os.getenv("FROM_EMAIL")
+    msg["To"]=recipients
+    msg.set_content(body)
+
+    with smtplib.SMTP(os.getenv("SMTP_HOST") , int(os.getenv("SMTP_PORT"))) as smtp:
+        smtp.starttls()
+        smtp.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASS"))
+        smtp.send_message(msg)
+
+
 if __name__== "__main__":
-    url = "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+    url = "http://127.0.0.1:5000/"
     res=html_to_pdf(url)
     # print("Done")
     hashed_value=generate_256sha(res)
@@ -124,7 +148,30 @@ if __name__== "__main__":
         save_state(store_hash)
     else:
         if x["hash_val"] != hashed_value:
-            answer = analyze_change(x["content"], res)
+            summary, importance = analyze_change(x["content"], res)
+            if importance >=4:
+                name="Income tax Department"
+                recipients="arnabjuniormondal123@gmail.com",
+
+                body=(
+                    f"Change detected for {name}\n\n"
+                    f"URL : url \n\n"
+                    f"AI Analysis: \n {summary}"
+                )
+                send_email(f"[Alert] {name}", body , recipients)
+                print(f"[{name}] Notification sent with AI summary.")
+                store_hash= {"hash_val": hashed_value, "content" : res}
+                save_state(store_hash)
+            else:
+                print("No changes . We are good!!!")
+
+
+
+
+            
+
+
+    
 
             
         
