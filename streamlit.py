@@ -1,13 +1,10 @@
 import streamlit as st
 from google import genai
-import json,re
+import json, re
+from google.genai.types import GenerateContentConfig
 
 
-
-
-
-
-def calculate_incometax(user_income, user_age,user_regime):
+def calculate_incometax(user_income, user_age, user_regime):
     # print("Analyze changes")
     prompt = f"""
     You are given an HTML page that contains all the information about income tax slabs for different age groups. Give only the computed income tax answer in the below JSON format that calculates the income tax based on the user’s age {user_age} and annual income {user_income} and for Regime {user_regime}.
@@ -25,26 +22,23 @@ def calculate_incometax(user_income, user_age,user_regime):
 
     """
     client = genai.Client()
+    gemini_config = GenerateContentConfig(temperature=0.2)
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
+        model="gemini-2.5-flash", contents=prompt, config=gemini_config
     )
     return response.text
-    
+
 
 if __name__ == "__main__":
-    user_income=st.text_input("Enter your annual income")
-    user_age=st.text_input("Enter your age")
-    user_regime=st.text_input("Enter your preferred regime: Old Tax Regime or New Tax Regime")
+    user_income = st.text_input("Enter your annual income")
+    user_age = st.text_input("Enter your age")
+    user_regime = st.text_input(
+        "Enter your preferred regime: Old Tax Regime or New Tax Regime"
+    )
     if st.button("Calculate the income tax"):
-        tax=calculate_incometax(user_income=user_income, user_age=user_age,user_regime=user_regime)
-        clean = re.sub(r'(?s).*?(\{.*?\}).*', r'\1', tax)
-        i_tax=json.loads(clean)
-        st.write(f"The calculated income tax is :{i_tax["income_tax"]}")   
-        
-
-
-
-
-
-
+        tax = calculate_incometax(
+            user_income=user_income, user_age=user_age, user_regime=user_regime
+        )
+        clean = re.sub(r"(?s).*?(\{.*?\}).*", r"\1", tax)
+        i_tax = json.loads(clean)
+        st.write(f"The calculated income tax is :{i_tax["income_tax"]}")
