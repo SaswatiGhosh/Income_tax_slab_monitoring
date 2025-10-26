@@ -2,6 +2,8 @@ import streamlit as st
 from google import genai
 import json, re
 from google.genai.types import GenerateContentConfig
+from streamlit_extras.switch_page_button import switch_page
+
 
 
 def calculate_incometax(user_income, user_age, user_regime):
@@ -30,6 +32,23 @@ def calculate_incometax(user_income, user_age, user_regime):
 
 
 if __name__ == "__main__":
+    st.title("Income Tax Calcuator")
+    st.sidebar.header("Navigation")
+
+    if st.sidebar.button("Login"):
+        st.switch_page("pages/simple_st.py")
+
+    if st.sidebar.button("Register"):
+        st.write("You are on the About page.")
+
+    if st.sidebar.button("Subscribe"):
+        st.write("You are on the Contact page.")
+
+
+    st.navigation([
+        st.Page("pages/simple_st.py",title="Login", icon="🏠"),
+        # st.page_link("register.html", label="Register", icon="ℹ️"),
+    ], position="top", expanded=False) 
     user_income = st.text_input("Enter your annual income")
     user_age = st.text_input("Enter your age")
     user_regime = st.text_input(
@@ -42,3 +61,6 @@ if __name__ == "__main__":
         clean = re.sub(r"(?s).*?(\{.*?\}).*", r"\1", tax)
         i_tax = json.loads(clean)
         st.write(f"The calculated income tax is :{i_tax["income_tax"]}")
+
+
+
