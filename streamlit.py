@@ -4,7 +4,7 @@ pg = st.navigation(
     [
         st.Page("pages/home.py", title="Home", default=True),
         st.Page("pages/login.py", title="Login"),
-        # st.page_link("register.html", label="Register", icon="ℹ️"),
+        st.Page("pages/register.py", title="Register"),
     ],
     position="top",
     expanded=False,
