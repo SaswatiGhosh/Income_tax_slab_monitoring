@@ -1,6 +1,6 @@
 import streamlit as st
 from google import genai
-import json, re
+import json, re,os
 import pandas as pd
 from google.genai.types import GenerateContentConfig
 
@@ -40,6 +40,24 @@ def calculate_incometax(user_income, user_age, user_regime):
     )
     return response.text
 
+SUBSCRIBE_FILE='subscribe.csv'
+def add_to_subscribe_csv(user):
+    email=""
+    if not os.path.exists(SUBSCRIBE_FILE):
+        df=pd.DataFrame(columns=["Username", "Email"])
+        df.to_csv(SUBSCRIBE_FILE)
+    user_df=load_users()
+    for i,u in user_df.iterrows():
+        if u['Username'] == user:
+            email=u['Email']
+    
+    dataframe=pd.read_csv(SUBSCRIBE_FILE)
+    new_data=[user,email]
+    dataframe=pd.concat([dataframe,new_data], ignore_index=True)
+    df.to_csv(SUBSCRIBE_FILE, index=False)
+
+    
+
 
 def subscribe_function():
     if not st.session_state["logged_in"]:
@@ -50,6 +68,8 @@ def subscribe_function():
         for user in userData["Username"]:
             if user == username:
                 st.write(f"Subscribed user: {username}")
+                add_to_subscribe_csv(user)
+
         st.success("Subscribed successfully!")
 
 

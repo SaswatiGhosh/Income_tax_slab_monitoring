@@ -25,12 +25,18 @@ def authenticate_users(username, password, user_df):
 
     # user_found=pd.Series([user_df["Username"]==username , user_df["Password"]==password])
     # print(user_df)
-    result = (user_df["Username"] == username) & (user_df["Password"] == password)
-    print(result)
-    if result.bool():
-        return True
-    else:
-        return False
+    flag=False
+    for i, user in user_df.iterrows():
+        if (user["Username"]== username) and (user['Password']==password): 
+            flag=True
+    return flag
+            
+    # result = (user_df["Username"] == username) & (user_df["Password"] == password)
+    # print(result)
+    # if result.bool():
+    #     return True
+    # else:
+    #     return False
 
     # if user_found.all():
     #     return True
@@ -55,6 +61,7 @@ if not st.session_state["logged_in"]:
             st.switch_page("pages/home.py")
         else:
             st.error("Invalid username or password")
+            st.switch_page("pages/register.py")
 else:
     st.write("You are logged in")
     if st.button("Logout"):
