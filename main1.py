@@ -1,29 +1,42 @@
 import pdfkit
 import pdfplumber
 import requests
-import hashlib, os, json,re
+import hashlib, os, json, re
 from google import genai
 from email.message import EmailMessage
 import smtplib
+import streamlit as st
+
+SUBSCRIBE_FILE = "subscribe.csv"
+
+STATE_FILE = "state.json"
 
 
-STATE_FILE="state.json"
+def load_subscribers():
+    try:
+        subscribers_df = pd.read_csv(SUBSCRIBE_FILE)
+        return subscribers_df
+    except FileNotFoundError:
+        st.error("User data file not found. Please create 'users.csv'.")
 
 
 def generate_256sha(res):
-    encoded_data = res.encode('utf-8')
+    encoded_data = res.encode("utf-8")
     sha256_hash_object = hashlib.sha256()
     sha256_hash_object.update(encoded_data)
     return sha256_hash_object.hexdigest()
+
 
 def load_state():
     if os.path.exists(STATE_FILE):
         return json.load(open(STATE_FILE))
     return {}
 
+
 def save_state(hashed_value):
-    with open(STATE_FILE,"w") as f:
-        json.dump(hashed_value, f, indent =2)
+    with open(STATE_FILE, "w") as f:
+        json.dump(hashed_value, f, indent=2)
+
 
 def analyze_change(old_text, new_text):
     # print("Analyze changes")
@@ -52,17 +65,14 @@ def analyze_change(old_text, new_text):
         model="gemini-2.5-flash",
         contents=prompt,
     )
-    res=response.text
-    clean = re.sub(r'(?s).*?(\{.*?\}).*', r'\1', res)
+    res = response.text
+    clean = re.sub(r"(?s).*?(\{.*?\}).*", r"\1", res)
     print(clean)
-    x=json.loads(clean)
+    x = json.loads(clean)
     print(x)
 
-    
-    
-    return x["summary"],x["importance"]
+    return x["summary"], x["importance"]
 
-     
 
 def html_to_pdf(url):
 
@@ -76,7 +86,9 @@ def html_to_pdf(url):
     # 1. Remove tags that load or execute external resources
     res = re.sub(r"<script[^>]*>.*?</script>", "", res, flags=re.IGNORECASE | re.DOTALL)
     res = re.sub(r"<iframe[^>]*>.*?</iframe>", "", res, flags=re.IGNORECASE | re.DOTALL)
-    res = re.sub(r"<noscript[^>]*>.*?</noscript>", "", res, flags=re.IGNORECASE | re.DOTALL)
+    res = re.sub(
+        r"<noscript[^>]*>.*?</noscript>", "", res, flags=re.IGNORECASE | re.DOTALL
+    )
     res = re.sub(r"<object[^>]*>.*?</object>", "", res, flags=re.IGNORECASE | re.DOTALL)
     res = re.sub(r"<embed[^>]*>.*?</embed>", "", res, flags=re.IGNORECASE | re.DOTALL)
     res = re.sub(r"<source[^>]*>.*?</source>", "", res, flags=re.IGNORECASE | re.DOTALL)
@@ -108,8 +120,6 @@ def html_to_pdf(url):
     # pdfkit.from_url(url, output_pdf, configuration=config, options=options)
     pdfkit.from_file(filename, output_pdf, configuration=config)
 
-
-
     with pdfplumber.open(output_pdf) as pdf:
         first_page = pdf.pages[0]
         text = first_page.extract_text()
@@ -123,60 +133,44 @@ def html_to_pdf(url):
     return res
 
 
-def send_email(subject , body, recipients):
-    msg=EmailMessage()
-    msg["Subject"]=subject
-    msg["From"] =os.getenv("FROM_EMAIL")
-    msg["To"]=recipients
+def send_email(subject, body, recipients):
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = os.getenv("FROM_EMAIL")
+    msg["To"] = recipients
     msg.set_content(body)
 
-    with smtplib.SMTP(os.getenv("SMTP_HOST") , int(os.getenv("SMTP_PORT"))) as smtp:
+    with smtplib.SMTP(os.getenv("SMTP_HOST"), int(os.getenv("SMTP_PORT"))) as smtp:
         smtp.starttls()
         smtp.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASS"))
         smtp.send_message(msg)
 
 
-if __name__== "__main__":
+if __name__ == "__main__":
     url = "http://127.0.0.1:5000/"
-    res=html_to_pdf(url)
+    res = html_to_pdf(url)
     # print("Done")
-    hashed_value=generate_256sha(res)
-    x=load_state()
-    
-    if x=={}:
-        store_hash= {"hash_val": hashed_value, "content" : res}
+    hashed_value = generate_256sha(res)
+    x = load_state()
+    subs = load_subscribers()
+    if x == {}:
+        store_hash = {"hash_val": hashed_value, "content": res}
         save_state(store_hash)
     else:
         if x["hash_val"] != hashed_value:
             summary, importance = analyze_change(x["content"], res)
-            if importance >=4:
-                name="Income tax Department"
-                recipients="arnabjuniormondal123@gmail.com",
-
-                body=(
-                    f"Change detected for {name}\n\n"
-                    f"URL : url \n\n"
-                    f"AI Analysis: \n {summary}"
-                )
-                send_email(f"[Alert] {name}", body , recipients)
-                print(f"[{name}] Notification sent with AI summary.")
-                store_hash= {"hash_val": hashed_value, "content" : res}
+            if importance >= 4:
+                for index, sub in subs.iterrows():
+                    name = "Income tax Department"
+                    recipients = sub["Email"]
+                    body = (
+                        f"Change detected for {sub["Username"]}\n\n"
+                        f"URL : url \n\n"
+                        f"AI Analysis: \n {summary}"
+                    )
+                    send_email(f"[Alert] {sub["Username"]}", body, recipients)
+                    print(f"[{sub["Username"]}] Notification sent with AI summary.")
+                store_hash = {"hash_val": hashed_value, "content": res}
                 save_state(store_hash)
             else:
                 print("No changes . We are good!!!")
-
-
-
-
-            
-
-
-    
-
-            
-        
-
-
-
-
-

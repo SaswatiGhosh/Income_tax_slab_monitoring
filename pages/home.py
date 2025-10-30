@@ -1,17 +1,26 @@
 import streamlit as st
 from google import genai
-import json, re,os
+import json, re, os
 import pandas as pd
 from google.genai.types import GenerateContentConfig
 
 # from streamlit_extras.switch_page_button import switch_page
 CSV_FILE = "registration.csv"
+SUBSCRIBE_FILE = "subscribe.csv"
 
 
 def load_users():
     try:
         users_df = pd.read_csv(CSV_FILE)
         return users_df
+    except FileNotFoundError:
+        st.error("User data file not found. Please create 'users.csv'.")
+
+
+def load_subscribers():
+    try:
+        subscribers_df = pd.read_csv(SUBSCRIBE_FILE)
+        return subscribers_df
     except FileNotFoundError:
         st.error("User data file not found. Please create 'users.csv'.")
 
@@ -40,37 +49,34 @@ def calculate_incometax(user_income, user_age, user_regime):
     )
     return response.text
 
-SUBSCRIBE_FILE='subscribe.csv'
-def add_to_subscribe_csv(user):
-    email=""
-    if not os.path.exists(SUBSCRIBE_FILE):
-        df=pd.DataFrame(columns=["Username", "Email"])
-        df.to_csv(SUBSCRIBE_FILE)
-    user_df=load_users()
-    for i,u in user_df.iterrows():
-        if u['Username'] == user:
-            email=u['Email']
-    
-    dataframe=pd.read_csv(SUBSCRIBE_FILE)
-    new_data=[user,email]
-    dataframe=pd.concat([dataframe,new_data], ignore_index=True)
-    df.to_csv(SUBSCRIBE_FILE, index=False)
 
-    
+def add_to_subscribe_csv(user, email):
+    if not os.path.exists(SUBSCRIBE_FILE):
+        df = pd.DataFrame(columns=["Username", "Email"])
+        df.to_csv(SUBSCRIBE_FILE)
+
+    subscriber = load_subscribers()
+    for index, subs in subscriber.iterrows():
+        if subs["Username"] == user and subs["Email"] == email:
+            st.info("You are already subscribed!")
+            return
+    dataframe = pd.read_csv(SUBSCRIBE_FILE)
+    new_data = [[user, email]]
+    new_data = pd.DataFrame(new_data, columns=["Username", "Email"])
+    dataframe = pd.concat([dataframe, new_data], ignore_index=True)
+    dataframe.to_csv(SUBSCRIBE_FILE, index=False)
+    st.success("Subscribed successfully!")
 
 
 def subscribe_function():
-    if not st.session_state["logged_in"]:
+    if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
         st.switch_page("pages/login.py")
     else:
         userData = load_users()
         username = st.session_state["username"]
-        for user in userData["Username"]:
-            if user == username:
-                st.write(f"Subscribed user: {username}")
-                add_to_subscribe_csv(user)
-
-        st.success("Subscribed successfully!")
+        for i, user in userData.iterrows():
+            if user["Username"] == username:
+                add_to_subscribe_csv(username, user["Email"])
 
 
 st.title("Income Tax Calcuator")
