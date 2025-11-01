@@ -5,7 +5,8 @@ import hashlib, os, json, re
 from google import genai
 from email.message import EmailMessage
 import smtplib
-import streamlit as st
+import app as st
+import pandas as pd
 
 SUBSCRIBE_FILE = "subscribe.csv"
 
@@ -146,8 +147,10 @@ def send_email(subject, body, recipients):
         smtp.send_message(msg)
 
 
-if __name__ == "__main__":
-    url = "http://127.0.0.1:5000/"
+def mainFunction():
+    url = (
+        "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+    )
     res = html_to_pdf(url)
     # print("Done")
     hashed_value = generate_256sha(res)
@@ -174,3 +177,7 @@ if __name__ == "__main__":
                 save_state(store_hash)
             else:
                 print("No changes . We are good!!!")
+
+
+if __name__ == "__main__":
+    mainFunction()

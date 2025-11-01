@@ -25,12 +25,12 @@ def authenticate_users(username, password, user_df):
 
     # user_found=pd.Series([user_df["Username"]==username , user_df["Password"]==password])
     # print(user_df)
-    flag=False
+    flag = False
     for i, user in user_df.iterrows():
-        if (user["Username"]== username) and (user['Password']==password): 
-            flag=True
+        if (user["Username"] == username) and (user["Password"] == password):
+            flag = True
     return flag
-            
+
     # result = (user_df["Username"] == username) & (user_df["Password"] == password)
     # print(result)
     # if result.bool():
