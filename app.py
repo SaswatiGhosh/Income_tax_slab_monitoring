@@ -9,5 +9,5 @@ pg = st.navigation(
     position="top",
     expanded=False,
 )
-st.set_page_config(page_title="Income Tax Calcuator")
+st.set_page_config(page_title="Income Tax Calculator")
 pg.run()
